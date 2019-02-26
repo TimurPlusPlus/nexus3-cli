@@ -419,7 +419,14 @@ class NexusClient(object):
                 'required by raw repositories')
 
         params = {'repository': dst_repo}
-        files = {'raw.asset1': open(src_file, 'rb').read()}
+
+        files = {'raw.asset1': b''}  # FIXME me
+        if isinstance(src_file, bytes):  # FIXME me
+            files['raw.asset1'] = src_file  # FIXME me
+        else:  # FIXME me
+            # files = {'raw.asset1': open(src_file, 'rb').read()}
+            files['raw.asset1'] = open(src_file, 'rb').read()  # FIXME me
+
         data = {
             'raw.directory': dst_dir,
             'raw.asset1.filename': dst_file,
@@ -546,7 +553,7 @@ class NexusClient(object):
         :param dst_file: destination file name.
         :return: number of files uploaded.
         """
-        if os.path.isdir(file_or_dir):
+        if not isinstance(file_or_dir, bytes) and os.path.isdir(file_or_dir):  # FIXME me
             if dst_file is None:
                 return self.upload_directory(file_or_dir, dst_repo, dst_dir,
                                              **kwargs)
@@ -681,11 +688,14 @@ class NexusClient(object):
                 'Downloading from {download_url}. '
                 'Reason: {response.reason}'.format(**locals()))
 
-        with open(destination, 'wb') as fd:
-            LOG.debug('Writing {download_url} to {destination}\n'.format(
-                **locals()))
-            for chunk in response.iter_content():
-                fd.write(chunk)
+        if isinstance(destination, bytes):  # FIXME me
+            return response.content  # FIXME me
+        else:   # FIXME me
+            with open(destination, 'wb') as fd:
+                LOG.debug('Writing {download_url} to {destination}\n'.format(
+                    **locals()))
+                for chunk in response.iter_content():
+                    fd.write(chunk)
 
     def download(self, source, destination, **kwargs):
         """Process a download. The source must be a valid Nexus 3
@@ -709,9 +719,10 @@ class NexusClient(object):
         """
 
         download_count = 0
-        if source.endswith(self._remote_sep) and \
-                not (destination.endswith('.') or destination.endswith('..')):
-            destination += self._local_sep
+        if not isinstance(destination, bytes):  # FIXME me
+            if source.endswith(self._remote_sep) and \
+                    not (destination.endswith('.') or destination.endswith('..')):
+                destination += self._local_sep
 
         artefacts = self.list_raw(source)
 
@@ -721,23 +732,27 @@ class NexusClient(object):
         for artefact in artefacts:
             download_url = artefact['downloadUrl']
             artefact_path = artefact['path']
-            download_path = self._remote_path_to_local(
-                artefact_path, destination, kwargs.get('flatten'))
+            if not isinstance(destination, bytes):  # FIXME me
+                download_path = self._remote_path_to_local(
+                    artefact_path, destination, kwargs.get('flatten'))
+            else:
+                download_path = destination
 
-            if self._should_skip_download(
-                    download_url, download_path,
-                    artefact, kwargs.get('nocache')):
-                download_count += 1
-                continue
+            # FIXME me
+            # if self._should_skip_download(
+            #         download_url, download_path,
+            #         artefact, kwargs.get('nocache')):
+            #     download_count += 1
+            #     continue
 
             try:
-                self.download_file(download_url, download_path)
+                file = self.download_file(download_url, download_path)  # FIXME me
                 download_count += 1
             except exception.DownloadError:
                 LOG.warning('Error downloading {}\n'.format(download_url))
                 continue
 
-        return download_count
+        return file, download_count
 
     def delete(self, repository_path, **kwargs):
         """
