@@ -11,7 +11,7 @@ from clint.textui import progress
 try:
     from urllib.parse import urljoin  # Python 3
 except ImportError:
-    from urlparse import urljoin      # Python 2
+    from urlparse import urljoin  # Python 2
 
 from . import exception, nexus_util
 from .repository import RepositoryCollection
@@ -529,14 +529,14 @@ class NexusClient(object):
         :rtype: int
         """
         file_set = self._get_upload_fileset(
-                            src_dir, kwargs.get('recurse', True))
+            src_dir, kwargs.get('recurse', True))
         file_count = len(file_set)
         file_set = progress.bar(file_set, expected_size=file_count)
 
         for relative_filepath in file_set:
             file_path = os.path.join(src_dir, relative_filepath)
             sub_directory = self._get_upload_subdirectory(
-                            dst_dir, file_path, kwargs.get('flatten', False))
+                dst_dir, file_path, kwargs.get('flatten', False))
             self.upload_file(file_path, dst_repo, sub_directory)
 
         return file_count
@@ -670,6 +670,16 @@ class NexusClient(object):
 
         return False
 
+    def _request_file(self, download_url):
+        response = self._get(download_url)
+
+        if response.status_code != 200:
+            sys.stderr.write(response.__dict__)
+            raise exception.DownloadError(
+                'Downloading from {download_url}. '
+                'Reason: {response.reason}'.format(**locals()))
+        return response
+
     def download_file(self, download_url, destination):
         """Download an asset from Nexus artefact repository to local
         file system.
@@ -680,22 +690,20 @@ class NexusClient(object):
             location will be overwritten.
         :return:
         """
-        response = self._get(download_url)
+        response = self._request_file(download_url)
+        with open(destination, 'wb') as fd:
+            LOG.debug('Writing {download_url} to {destination}\n'.format(
+                **locals()))
+            for chunk in response.iter_content():
+                fd.write(chunk)
 
-        if response.status_code != 200:
-            sys.stderr.write(response.__dict__)
-            raise exception.DownloadError(
-                'Downloading from {download_url}. '
-                'Reason: {response.reason}'.format(**locals()))
-
-        if isinstance(destination, bytes):  # FIXME me
-            return response.content  # FIXME me
-        else:   # FIXME me
-            with open(destination, 'wb') as fd:
-                LOG.debug('Writing {download_url} to {destination}\n'.format(
-                    **locals()))
-                for chunk in response.iter_content():
-                    fd.write(chunk)
+    def download_stream(self, download_url):
+        """Download an asset from Nexus artefact repository to in-memory stream.
+         :param download_url: fully-qualified URL to asset being downloaded.
+         :return:
+         """
+        response = self._request_file(download_url)
+        return response.content  # FIXME me
 
     def download(self, source, destination, **kwargs):
         """Process a download. The source must be a valid Nexus 3
@@ -719,34 +727,63 @@ class NexusClient(object):
         """
 
         download_count = 0
-        if not isinstance(destination, bytes):  # FIXME me
-            if source.endswith(self._remote_sep) and \
-                    not (destination.endswith('.') or destination.endswith('..')):
-                destination += self._local_sep
+        if source.endswith(self._remote_sep) and \
+                not (destination.endswith('.') or destination.endswith('..')):
+            destination += self._local_sep
 
         artefacts = self.list_raw(source)
 
         artefacts = progress.bar(
-                [a for a in artefacts], label='Downloading')
+            [a for a in artefacts], label='Downloading')
 
         for artefact in artefacts:
             download_url = artefact['downloadUrl']
             artefact_path = artefact['path']
-            if not isinstance(destination, bytes):  # FIXME me
-                download_path = self._remote_path_to_local(
-                    artefact_path, destination, kwargs.get('flatten'))
-            else:
-                download_path = destination
+            download_path = self._remote_path_to_local(
+                artefact_path, destination, kwargs.get('flatten'))
 
-            # FIXME me
-            # if self._should_skip_download(
-            #         download_url, download_path,
-            #         artefact, kwargs.get('nocache')):
-            #     download_count += 1
-            #     continue
+            if self._should_skip_download(
+                    download_url, download_path,
+                    artefact, kwargs.get('nocache')):
+                download_count += 1
+                continue
 
             try:
-                file = self.download_file(download_url, download_path)  # FIXME me
+                self.download_file(download_url, download_path)
+                download_count += 1
+            except exception.DownloadError:
+                LOG.warning('Error downloading {}\n'.format(download_url))
+                continue
+
+        return download_count
+
+    def download(self, source):
+        """Process a download. The source must be a valid Nexus 3
+        repository path, including the repository name as the first component
+        of the path.
+
+        The destination must be a local file name or directory.
+
+        If a file name is given as destination, the asset may be renamed. The
+        final destination will depend on self.flatten: when True, the remote
+        path isn't reproduced locally.
+
+        :param source: location of artefact or directory on the repository
+            service.
+        :return: list of loaded files' streams and number of downloaded files.
+        """
+        download_count = 0
+
+        artefacts = self.list_raw(source)
+
+        artefacts = progress.bar(
+            [a for a in artefacts], label='Downloading')
+
+        file = []
+        for artefact in artefacts:
+            download_url = artefact['downloadUrl']
+            try:
+                file.append(self.download_stream(download_url))
                 download_count += 1
             except exception.DownloadError:
                 LOG.warning('Error downloading {}\n'.format(download_url))
