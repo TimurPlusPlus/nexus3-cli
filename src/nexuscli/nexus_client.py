@@ -697,7 +697,7 @@ class NexusClient(object):
             for chunk in response.iter_content():
                 fd.write(chunk)
 
-    def download_stream(self, download_url):
+    def _download_stream(self, download_url):
         """Download an asset from Nexus artefact repository to in-memory stream.
          :param download_url: fully-qualified URL to asset being downloaded.
          :return:
@@ -757,20 +757,14 @@ class NexusClient(object):
 
         return download_count
 
-    def download(self, source):
+    def download_stream(self, source):
         """Process a download. The source must be a valid Nexus 3
         repository path, including the repository name as the first component
         of the path.
 
-        The destination must be a local file name or directory.
-
-        If a file name is given as destination, the asset may be renamed. The
-        final destination will depend on self.flatten: when True, the remote
-        path isn't reproduced locally.
-
         :param source: location of artefact or directory on the repository
             service.
-        :return: list of loaded files' streams and number of downloaded files.
+        :return: list of loaded artefacts' streams and number of downloaded artefacts.
         """
         download_count = 0
 
@@ -783,7 +777,7 @@ class NexusClient(object):
         for artefact in artefacts:
             download_url = artefact['downloadUrl']
             try:
-                file.append(self.download_stream(download_url))
+                file.append(self._download_stream(download_url))
                 download_count += 1
             except exception.DownloadError:
                 LOG.warning('Error downloading {}\n'.format(download_url))
