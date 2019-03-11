@@ -553,7 +553,7 @@ class NexusClient(object):
         :param dst_file: destination file name.
         :return: number of files uploaded.
         """
-        if not isinstance(file_or_dir, bytes) and os.path.isdir(file_or_dir):  # FIXME me
+        if os.path.isdir(file_or_dir):
             if dst_file is None:
                 return self.upload_directory(file_or_dir, dst_repo, dst_dir,
                                              **kwargs)
@@ -585,6 +585,25 @@ class NexusClient(object):
         repo, directory, filename = self.split_component_path(destination)
         upload_count = self._upload_dir_or_file(
             source, repo, directory, filename, **kwargs)
+
+        return upload_count
+
+    def upload_stream(self, source, destination):  # TODO
+        """
+        Process an upload. The source must be a file-like object.
+
+        The destination must be a valid Nexus 3 repository path, including the
+        repository name as the first component of the path.
+
+        :param source: file-like object to be uploaded.
+        :param destination: destination path in Nexus, including repository
+            name and, if required, directory name (e.g. raw repos require a
+            directory).
+        :return: number of files uploaded.
+        """
+        repo, directory, filename = self.split_component_path(destination)
+        upload_count = self.upload_file(
+            source, repo, directory, filename)
 
         return upload_count
 
@@ -757,6 +776,7 @@ class NexusClient(object):
 
         return download_count
 
+    # TODO me refactor
     def download_stream(self, source):
         """Process a download. The source must be a valid Nexus 3
         repository path, including the repository name as the first component
