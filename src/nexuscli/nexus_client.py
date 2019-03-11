@@ -588,7 +588,7 @@ class NexusClient(object):
 
         return upload_count
 
-    def upload_stream(self, source, destination):  # TODO
+    def upload_stream(self, source, destination):
         """
         Process an upload. The source must be a file-like object.
 
