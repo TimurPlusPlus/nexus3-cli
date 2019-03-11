@@ -420,12 +420,7 @@ class NexusClient(object):
 
         params = {'repository': dst_repo}
 
-        files = {'raw.asset1': b''}  # FIXME me
-        if isinstance(src_file, bytes):  # FIXME me
-            files['raw.asset1'] = src_file  # FIXME me
-        else:  # FIXME me
-            # files = {'raw.asset1': open(src_file, 'rb').read()}
-            files['raw.asset1'] = open(src_file, 'rb').read()  # FIXME me
+        files = {'raw.asset1': open(src_file, 'rb').read()}
 
         data = {
             'raw.directory': dst_dir,
