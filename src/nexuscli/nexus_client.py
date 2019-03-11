@@ -717,7 +717,7 @@ class NexusClient(object):
          :return:
          """
         response = self._request_file(download_url)
-        return response.content  # FIXME me
+        return io.BytesIO(response.content)  # FIXME me
 
     def download(self, source, destination, **kwargs):
         """Process a download. The source must be a valid Nexus 3
